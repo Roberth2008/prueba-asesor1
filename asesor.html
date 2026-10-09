@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FEA 2027 · Módulo de Asesores | DRE Cañas - MEP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { mep: {
+                blue: '#0B3C8C', darkBlue: '#07265B', navy: '#14213D',
+                red: '#C8102E', lightBg: '#F4F7FA', gold: '#D4AF37'
+            } } } }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Firebase: Firestore + Authentication -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+
+    <!-- ==================== PANTALLA DE INICIO DE SESIÓN ==================== -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-mep-darkBlue via-mep-blue to-mep-darkBlue">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-6">
+            <div class="text-center space-y-2">
+                <img src="logo-dre-canas.png" alt="Logo DRE Cañas" class="h-14 w-auto object-contain mx-auto" onerror="this.style.display='none'">
+                <h1 class="text-xl font-extrabold text-mep-navy">Festival Estudiantil de las Artes <span class="text-amber-500">2027</span></h1>
+                <p class="text-xs text-slate-500">Módulo de Asesores · Dirección Regional de Educación Cañas</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1" for="loginEmail">Correo institucional</label>
+                    <input type="email" id="loginEmail" autocomplete="username" placeholder="nombre@mep.go.cr"
+                        class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1" for="loginPassword">Contraseña</label>
+                    <input type="password" id="loginPassword" autocomplete="current-password"
+                        class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                </div>
+                <p id="loginError" class="hidden bg-red-50 border border-red-200 text-mep-red text-xs font-semibold rounded-lg px-3 py-2"></p>
+                <button id="btnLogin" onclick="iniciarSesion()" class="btn-mep-primary w-full py-3 rounded-xl font-bold text-sm">Ingresar</button>
+                <button type="button" onclick="recuperarContrasena()" class="w-full text-center text-[11px] font-bold text-mep-blue hover:underline">¿Olvidó su contraseña?</button>
+            </div>
+
+            <p class="text-[11px] text-slate-400 text-center">Si no tiene cuenta, solicítela al administrador del FEA.</p>
+        </div>
+    </div>
+
+    <!-- ==================== APLICACIÓN (solo con sesión iniciada) ==================== -->
+    <div id="appShell" class="hidden min-h-screen flex flex-col">
+
+        <header class="bg-gradient-to-r from-mep-darkBlue via-mep-blue to-mep-darkBlue text-white shadow-xl sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-20 gap-3">
+                    <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <img src="logo-dre-canas.png" alt="Logo DRE Cañas - MEP" class="h-12 w-auto object-contain shrink-0" onerror="this.style.display='none'">
+                        <div class="min-w-0">
+                            <h1 class="text-lg sm:text-2xl font-extrabold tracking-tight text-white truncate">
+                                Festival Estudiantil de las Artes <span class="text-amber-400">2027</span>
+                            </h1>
+                            <p class="text-xs text-blue-100 hidden sm:block">Módulo de Asesores · Registro de inscripciones</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider hidden md:inline-block">Rol: Asesor</span>
+                        <span id="firebaseStatus" class="bg-amber-900/60 text-amber-200 text-[10px] px-2 py-0.5 rounded border border-amber-700 hidden sm:inline-block">Conectando...</span>
+                        <div class="flex items-center gap-2 bg-white/10 border border-white/20 rounded-lg pl-3 pr-1 py-1">
+                            <span id="userName" class="text-xs font-semibold max-w-[140px] truncate">—</span>
+                            <button onclick="cerrarSesion()" class="p-1.5 rounded-md hover:bg-white/20" title="Cerrar sesión">
+                                <i data-lucide="log-out" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="bg-slate-900/40 border-t border-white/10 overflow-x-auto">
+                <div class="max-w-7xl mx-auto px-4 flex space-x-1 sm:space-x-6 text-sm font-medium">
+                    <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-3 px-3 sm:px-4 border-b-2 border-amber-400 text-amber-400 font-bold flex items-center gap-2 whitespace-nowrap transition">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Mi Panel
+                    </button>
+                    <button onclick="switchTab('registro')" id="tab-registro" class="py-3 px-3 sm:px-4 border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap transition">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> Nueva Inscripción
+                    </button>
+                    <button onclick="switchTab('inscripciones')" id="tab-inscripciones" class="py-3 px-3 sm:px-4 border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap transition">
+                        <i data-lucide="clipboard-list" class="w-4 h-4"></i> Inscripciones
+                        <span id="tabBadgeMias" class="bg-amber-400 text-slate-950 font-extrabold text-[11px] px-1.5 py-0.5 rounded-full">0</span>
+                    </button>
+                    <button onclick="switchTab('estudiantes')" id="tab-estudiantes" class="py-3 px-3 sm:px-4 border-b-2 border-transparent text-slate-300 hover:text-white flex items-center gap-2 whitespace-nowrap transition">
+                        <i data-lucide="users" class="w-4 h-4"></i> Estudiantes
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+            <!-- ==================== PANEL ==================== -->
+            <section id="view-dashboard" class="space-y-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 flex gap-3 items-start">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-mep-blue shrink-0 mt-0.5"></i>
+                    <p><strong>Sus permisos:</strong> puede registrar inscripciones y estudiantes nuevos, y editar <strong>únicamente lo que usted ingresó</strong>. No es posible eliminar registros; si necesita corregir o eliminar algo de otra persona o cambiar una identidad, solicítelo al administrador.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mis inscripciones</p>
+                                <h3 id="statMisInscripciones" class="text-3xl font-black text-mep-navy mt-1">0</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 text-mep-blue flex items-center justify-center"><i data-lucide="file-text" class="w-6 h-6"></i></div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Obras individuales y grupales que usted registró</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-md">
+                        <p class="text-xs font-bold text-emerald-100 uppercase tracking-wider">Mis estudiantes</p>
+                        <h3 id="statMisEstudiantes" class="text-4xl font-black mt-1">0</h3>
+                        <p class="text-xs text-emerald-100 mt-2 font-medium">Personas únicas en sus inscripciones</p>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-red-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold text-mep-red uppercase tracking-wider">Polifacéticos</p>
+                                <h3 id="statMisPoli" class="text-3xl font-black text-mep-red mt-1">0</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-red-50 text-mep-red flex items-center justify-center"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Participan en más de 1 área (1 solo refrigerio)</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                        <h2 class="text-lg font-bold text-mep-navy flex items-center gap-2 mb-1">
+                            <i data-lucide="users" class="w-5 h-5 text-mep-blue"></i> Mis estudiantes polifacéticos
+                        </h2>
+                        <p class="text-xs text-slate-500 mb-4">Estudiantes suyos inscritos en 2 o más áreas del festival.</p>
+                        <div id="listPolifaceticosContainer" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 flex flex-col justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-mep-navy mb-1 flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-5 h-5 text-mep-blue"></i> Mis obras por área
+                            </h2>
+                            <p class="text-xs text-slate-500 mb-4">Distribución de sus inscripciones</p>
+                            <div id="chartAreasContainer" class="space-y-3"></div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-slate-100">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Por circuito educativo</h3>
+                            <div id="circuitoStatsContainer" class="grid grid-cols-5 gap-1 text-center"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="statGlobal" class="text-center text-[11px] text-slate-400"></p>
+            </section>
+
+            <!-- ==================== NUEVA INSCRIPCIÓN ==================== -->
+            <section id="view-registro" class="hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 max-w-4xl mx-auto">
+                    <div class="mb-8">
+                        <div class="flex items-center justify-between max-w-2xl mx-auto relative">
+                            <div class="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
+                            <div id="stepperLine" class="absolute top-1/2 left-0 h-1 bg-mep-blue -translate-y-1/2 z-0 transition-all duration-300" style="width: 0%"></div>
+                            <div class="relative z-10 flex flex-col items-center">
+                                <div id="stepDot-1" class="w-10 h-10 rounded-full bg-mep-blue text-white font-bold flex items-center justify-center shadow-md transition-all">1</div>
+                                <span class="text-xs font-semibold text-mep-navy mt-1">Categoría</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center">
+                                <div id="stepDot-2" class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center transition-all">2</div>
+                                <span class="text-xs font-medium text-slate-500 mt-1">Obra y Boletas</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center">
+                                <div id="stepDot-3" class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center transition-all">3</div>
+                                <span class="text-xs font-medium text-slate-500 mt-1">Estudiantes</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center">
+                                <div id="stepDot-4" class="w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold flex items-center justify-center transition-all">4</div>
+                                <span class="text-xs font-medium text-slate-500 mt-1">Confirmar</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="formInscripcion" onsubmit="event.preventDefault();">
+                        <!-- PASO 1 -->
+                        <div id="formStep-1" class="space-y-5">
+                            <div class="border-b border-slate-100 pb-3">
+                                <h2 class="text-lg font-bold text-mep-navy flex items-center gap-2"><i data-lucide="layers" class="w-5 h-5 text-mep-blue"></i> Paso 1: Área, Disciplina e Institución</h2>
+                                <p class="text-xs text-slate-500">Seleccione el circuito y los parámetros artísticos de la inscripción.</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Circuito Educativo *</label>
+                                    <select id="regCircuito" onchange="onCircuitoChange(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                        <option value="">-- Seleccione Circuito --</option>
+                                        <option value="01">Circuito 01 (Cañas)</option>
+                                        <option value="02">Circuito 02 (Abangares)</option>
+                                        <option value="03">Circuito 03 (Tilarán)</option>
+                                        <option value="04">Circuito 04 (Colorado)</option>
+                                        <option value="05">Circuito 05 (La Altura)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="block text-xs font-bold text-slate-700 uppercase">Institución Educativa *</label>
+                                        <button type="button" onclick="toggleInputManual('Institucion')" id="btnToggleInst" class="text-[11px] font-bold text-mep-blue hover:underline">+ Agregar manualmente</button>
+                                    </div>
+                                    <select id="regInstitucion" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none" disabled>
+                                        <option value="">-- Seleccione primero un Circuito --</option>
+                                    </select>
+                                    <input type="text" id="regInstitucionManual" placeholder="Escriba el nombre de la institución..." class="hidden w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Área Artística *</label>
+                                    <select id="regArea" onchange="onAreaChange(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                        <option value="">-- Seleccione Área --</option>
+                                        <option value="Escénicas">Escénicas</option>
+                                        <option value="Literarias">Literarias</option>
+                                        <option value="Musicales">Musicales</option>
+                                        <option value="Visuales">Visuales</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="block text-xs font-bold text-slate-700 uppercase">Disciplina / Modalidad *</label>
+                                        <button type="button" onclick="toggleInputManual('Disciplina')" id="btnToggleDisc" class="text-[11px] font-bold text-mep-blue hover:underline">+ Agregar manualmente</button>
+                                    </div>
+                                    <select id="regDisciplina" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none" disabled>
+                                        <option value="">-- Seleccione primero un Área --</option>
+                                    </select>
+                                    <input type="text" id="regDisciplinaManual" placeholder="Escriba la disciplina o modalidad..." class="hidden w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nivel Educativo *</label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer hover:bg-blue-50/50 has-[:checked]:border-mep-blue has-[:checked]:bg-blue-50/80">
+                                            <input type="radio" name="regNivel" value="Primaria" checked class="text-mep-blue focus:ring-mep-blue"><span class="text-sm font-semibold">Primaria</span>
+                                        </label>
+                                        <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer hover:bg-blue-50/50 has-[:checked]:border-mep-blue has-[:checked]:bg-blue-50/80">
+                                            <input type="radio" name="regNivel" value="Secundaria" class="text-mep-blue focus:ring-mep-blue"><span class="text-sm font-semibold">Secundaria</span>
+                                        </label>
+                                        <label class="border border-slate-200 rounded-xl p-3 flex items-center gap-2 cursor-pointer hover:bg-blue-50/50 has-[:checked]:border-mep-blue has-[:checked]:bg-blue-50/80">
+                                            <input type="radio" name="regNivel" value="Adultos" class="text-mep-blue focus:ring-mep-blue"><span class="text-sm font-semibold">Adultos / CINDEA</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-end pt-4">
+                                <button type="button" onclick="goToStep(2)" class="btn-mep-primary px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2">Siguiente: Detalle de la Obra <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- PASO 2 -->
+                        <div id="formStep-2" class="hidden space-y-5">
+                            <div class="border-b border-slate-100 pb-3">
+                                <h2 class="text-lg font-bold text-mep-navy flex items-center gap-2"><i data-lucide="music" class="w-5 h-5 text-mep-blue"></i> Paso 2: Obra y Verificación de Boletas</h2>
+                                <p class="text-xs text-slate-500">Ingrese el título de la obra y verifique el cumplimiento de las tres boletas MEP.</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre de la Obra / Proyecto / Interpretación *</label>
+                                    <input type="text" id="regObra" maxlength="150" placeholder="Ej: Leyendas de Guanacaste / El Güegüense" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Duración aprox. (min)</label>
+                                    <input type="number" id="regDuracion" min="1" max="180" value="10" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-mep-blue focus:bg-white outline-none">
+                                </div>
+                            </div>
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                <h3 class="text-xs font-bold uppercase text-slate-600 tracking-wider">Boletas oficiales presentadas (3/3 requeridas)</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <label class="flex items-center gap-2 bg-white p-3 rounded-lg border border-slate-200 cursor-pointer"><input type="checkbox" id="boletaInscripcion" checked class="rounded text-mep-blue w-4 h-4"><span class="text-xs font-bold">1. Boleta Inscripción (SI)</span></label>
+                                    <label class="flex items-center gap-2 bg-white p-3 rounded-lg border border-slate-200 cursor-pointer"><input type="checkbox" id="boletaResultados" checked class="rounded text-mep-blue w-4 h-4"><span class="text-xs font-bold">2. Boleta Resultados (SI)</span></label>
+                                    <label class="flex items-center gap-2 bg-white p-3 rounded-lg border border-slate-200 cursor-pointer"><input type="checkbox" id="boletaObservaciones" checked class="rounded text-mep-blue w-4 h-4"><span class="text-xs font-bold">3. Boleta Observaciones (SI)</span></label>
+                                </div>
+                            </div>
+                            <div class="flex justify-between pt-4">
+                                <button type="button" onclick="goToStep(1)" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-100 flex items-center gap-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Anterior</button>
+                                <button type="button" onclick="goToStep(3)" class="btn-mep-primary px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2">Siguiente: Estudiantes <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- PASO 3 -->
+                        <div id="formStep-3" class="hidden space-y-5">
+                            <div class="border-b border-slate-100 pb-3">
+                                <h2 class="text-lg font-bold text-mep-navy flex items-center gap-2"><i data-lucide="user-check" class="w-5 h-5 text-mep-blue"></i> Paso 3: Agregar Estudiantes</h2>
+                                <p class="text-xs text-slate-500">Digite la identidad. Si el estudiante ya está registrado, se autocompletará y se unificará su registro.</p>
+                            </div>
+
+                            <div class="bg-blue-50/60 rounded-xl p-4 border border-blue-200 space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                    <div class="md:col-span-3">
+                                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de identidad *</label>
+                                        <select id="inputTipoIdentidad" onchange="onTipoIdentidadChange(this.value)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-mep-blue outline-none">
+                                            <option value="cedula">Cédula costarricense</option>
+                                            <option value="dimex">DIMEX</option>
+                                            <option value="yisro">YIS RÓ</option>
+                                        </select>
+                                    </div>
+                                    <div class="md:col-span-4">
+                                        <label id="inputIdentidadLabel" class="block text-xs font-bold text-slate-700 uppercase mb-1">Número de cédula *</label>
+                                        <input type="text" id="inputCedula" oninput="liveCheckCedula(this.value)" placeholder="Ej: 1-2345-6789" autocomplete="off" inputmode="numeric" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-mep-blue outline-none">
+                                        <p id="inputIdentidadHint" class="text-[10px] text-slate-500 mt-1">9 dígitos · Ejemplo: 1-2345-6789</p>
+                                    </div>
+                                    <div class="md:col-span-5">
+                                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre completo *</label>
+                                        <input type="text" id="inputNombre" maxlength="120" placeholder="Ej: María José Rodríguez Vargas" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-mep-blue outline-none">
+                                    </div>
+                                    <div class="md:col-span-12 flex justify-end">
+                                        <button type="button" onclick="agregarEstudianteChip()" class="btn-mep-primary py-2 px-5 rounded-xl font-bold text-xs flex items-center justify-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i> Agregar estudiante</button>
+                                    </div>
+                                </div>
+
+                                <div id="studentLiveAlert" class="hidden bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900">
+                                    <div id="studentLiveAlertMsg"></div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
+                                    <div class="bg-white/80 border border-blue-100 rounded-lg px-3 py-2 text-[10px] text-slate-600"><span class="font-extrabold text-mep-navy">Cédula costarricense</span><br>9 dígitos · <span class="font-semibold">1-2345-6789</span></div>
+                                    <div class="bg-white/80 border border-blue-100 rounded-lg px-3 py-2 text-[10px] text-slate-600"><span class="font-extrabold text-mep-navy">DIMEX</span><br>11 o 12 dígitos · <span class="font-semibold">1558-2026-0001</span></div>
+                                    <div class="bg-white/80 border border-blue-100 rounded-lg px-3 py-2 text-[10px] text-slate-600"><span class="font-extrabold text-mep-navy">YIS RÓ</span><br>Alfanumérico · <span class="font-semibold">YRO-2026-0017</span></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-xs font-bold uppercase text-slate-600 tracking-wider">Integrantes de esta obra (<span id="chipCount">0</span>)</h3>
+                                    <span class="text-[11px] text-slate-500">Mínimo 1 estudiante</span>
+                                </div>
+                                <div id="chipsContainer" class="flex flex-wrap gap-2 min-h-[80px] p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl items-center justify-center"></div>
+                            </div>
+
+                            <div class="flex justify-between pt-4">
+                                <button type="button" onclick="goToStep(2)" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-100 flex items-center gap-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Anterior</button>
+                                <button type="button" onclick="goToStep(4)" class="btn-mep-primary px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2">Siguiente: Resumen <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- PASO 4 -->
+                        <div id="formStep-4" class="hidden space-y-5">
+                            <div class="border-b border-slate-100 pb-3">
+                                <h2 class="text-lg font-bold text-mep-navy flex items-center gap-2"><i data-lucide="check-square" class="w-5 h-5 text-mep-blue"></i> Paso 4: Confirmación final</h2>
+                                <p class="text-xs text-slate-500">Revise los datos. Podrá editar esta inscripción después, pero no eliminarla.</p>
+                            </div>
+                            <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4 text-sm">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div><span class="text-xs font-bold text-slate-400 block uppercase">Circuito:</span><span id="summaryCircuito" class="font-bold">-</span></div>
+                                    <div><span class="text-xs font-bold text-slate-400 block uppercase">Institución:</span><span id="summaryInstitucion" class="font-bold">-</span></div>
+                                    <div><span class="text-xs font-bold text-slate-400 block uppercase">Área / Disciplina:</span><span id="summaryAreaDisc" class="font-bold text-mep-blue">-</span></div>
+                                    <div><span class="text-xs font-bold text-slate-400 block uppercase">Nivel:</span><span id="summaryNivel" class="font-bold">-</span></div>
+                                </div>
+                                <div class="pt-3 border-t border-slate-200">
+                                    <span class="text-xs font-bold text-slate-400 block uppercase">Nombre de la obra:</span>
+                                    <span id="summaryObra" class="text-base font-extrabold text-mep-navy">-</span>
+                                </div>
+                                <div class="pt-3 border-t border-slate-200">
+                                    <span class="text-xs font-bold text-slate-400 block uppercase mb-2">Integrantes (<span id="summaryStudentCount">0</span>):</span>
+                                    <div id="summaryStudentsList" class="flex flex-wrap gap-2"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between pt-4">
+                                <button type="button" onclick="goToStep(3)" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-100 flex items-center gap-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Modificar estudiantes</button>
+                                <button type="button" id="btnGuardarInscripcion" onclick="guardarInscripcionFinal()" class="btn-mep-primary px-8 py-3 rounded-xl font-black text-base shadow-lg flex items-center gap-2"><i data-lucide="save" class="w-5 h-5"></i> Guardar inscripción</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ==================== INSCRIPCIONES ==================== -->
+            <section id="view-inscripciones" class="hidden space-y-5">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-mep-navy flex items-center gap-2"><i data-lucide="clipboard-list" class="w-6 h-6 text-mep-blue"></i> Inscripciones</h2>
+                        <p class="text-xs text-slate-500 mt-1">Puede editar las suyas. Las de otras personas se muestran en modo de solo lectura.</p>
+                    </div>
+                    <button onclick="actualizarDatos()" class="text-xs font-semibold text-mep-blue hover:text-mep-darkBlue flex items-center gap-1 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100 self-start md:self-auto">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Actualizar datos
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="relative">
+                        <input type="text" id="searchInscripciones" oninput="renderMisInscripciones()" placeholder="Buscar obra, institución, ID..." class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2 text-slate-400"></i>
+                    </div>
+                    <select id="filterAlcance" onchange="renderMisInscripciones()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <option value="MIAS">Solo las mías</option>
+                        <option value="TODAS">Todas (otras en solo lectura)</option>
+                    </select>
+                    <select id="filterAreaIns" onchange="renderMisInscripciones()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <option value="TODAS">Todas las áreas</option>
+                        <option value="Escénicas">Escénicas</option>
+                        <option value="Literarias">Literarias</option>
+                        <option value="Musicales">Musicales</option>
+                        <option value="Visuales">Visuales</option>
+                    </select>
+                    <div class="flex items-center justify-end text-xs font-bold text-slate-500">Mostrando: <span id="countInscripcionesFiltradas" class="text-mep-blue ml-1 font-extrabold">0</span>&nbsp;inscripciones</div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+                                    <th class="p-3.5">ID</th>
+                                    <th class="p-3.5">Obra / Disciplina</th>
+                                    <th class="p-3.5">Institución</th>
+                                    <th class="p-3.5 text-center">Integrantes</th>
+                                    <th class="p-3.5">Ingresada por</th>
+                                    <th class="p-3.5 text-center">Permiso</th>
+                                    <th class="p-3.5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableInscripcionesBody" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== ESTUDIANTES ==================== -->
+            <section id="view-estudiantes" class="hidden space-y-5">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                    <h2 class="text-xl font-extrabold text-mep-navy flex items-center gap-2"><i data-lucide="users" class="w-6 h-6 text-emerald-600"></i> Estudiantes</h2>
+                    <p class="text-xs text-slate-500 mt-1">Cada fila es una persona única. Las identidades de estudiantes ajenos aparecen parcialmente ocultas. Puede editar solo los que usted ingresó.</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="relative">
+                        <input type="text" id="searchEstudiantes" oninput="renderEstudiantesTabla()" placeholder="Buscar por nombre o identidad completa..." class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-9 pr-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2 text-slate-400"></i>
+                    </div>
+                    <select id="filterAlcanceEst" onchange="renderEstudiantesTabla()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <option value="MIOS">Solo los que yo ingresé</option>
+                        <option value="TODOS">Todos (otros en solo lectura)</option>
+                    </select>
+                    <select id="filterCircuito" onchange="renderEstudiantesTabla()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:bg-white outline-none">
+                        <option value="TODOS">Todos los circuitos</option>
+                        <option value="01">Circuito 01</option>
+                        <option value="02">Circuito 02</option>
+                        <option value="03">Circuito 03</option>
+                        <option value="04">Circuito 04</option>
+                        <option value="05">Circuito 05</option>
+                    </select>
+                    <div class="flex items-center justify-end text-xs font-bold text-slate-500">Mostrando: <span id="countEstudiantesFiltrados" class="text-mep-blue ml-1 font-extrabold">0</span>&nbsp;estudiantes</div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200 uppercase tracking-wider">
+                                    <th class="p-3.5">Identidad</th>
+                                    <th class="p-3.5">Nombre completo</th>
+                                    <th class="p-3.5">Institución</th>
+                                    <th class="p-3.5 text-center">Participaciones</th>
+                                    <th class="p-3.5 text-center">Permiso</th>
+                                    <th class="p-3.5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableEstudiantesBody" class="divide-y divide-slate-100 font-medium text-slate-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="bg-slate-900 text-slate-400 text-xs py-6 mt-12 border-t border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <span>Ministerio de Educación Pública de Costa Rica &copy; 2027</span>
+                <p class="text-slate-500">Dirección Regional de Educación Cañas · Módulo de Asesores FEA 2027</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ==================== MODALES ==================== -->
+
+    <!-- Detalle de estudiante -->
+    <div id="modalDetalleEstudiante" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <span id="modalEstCedula" class="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold">--</span>
+                    <h3 id="modalEstNombre" class="text-lg font-extrabold text-mep-navy mt-1">--</h3>
+                    <p id="modalEstInst" class="text-xs text-slate-500">--</p>
+                </div>
+                <button onclick="closeModal('modalDetalleEstudiante')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div>
+                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2">Inscripciones (<span id="modalEstCount">0</span>)</h4>
+                <div id="modalEstInscripcionesList" class="space-y-2 max-h-60 overflow-y-auto"></div>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-center gap-3 text-xs text-emerald-900 font-bold">
+                <i data-lucide="shopping-bag" class="w-5 h-5 text-emerald-600"></i>
+                <span>Entrega autorizada: exactamente 1 bolsita de refrigerio</span>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeModal('modalDetalleEstudiante')" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-xs text-slate-800">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ver / Editar inscripción -->
+    <div id="modalInscripcion" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-slate-100 my-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <div id="insModalBadge"></div>
+                    <h3 id="insModalTitulo" class="text-lg font-extrabold text-mep-navy mt-1">Inscripción</h3>
+                    <span id="insModalId" class="text-[11px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold">--</span>
+                </div>
+                <button onclick="closeModal('modalInscripcion')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <fieldset id="editFieldset" class="space-y-4 min-w-0 disabled:opacity-90">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Circuito *</label>
+                        <select id="editCircuito" onchange="onEditCircuitoChange(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Institución *</label>
+                        <input id="editInstitucion" list="dlInstituciones" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100">
+                        <datalist id="dlInstituciones"></datalist>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Área *</label>
+                        <select id="editArea" onchange="onEditAreaChange(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Disciplina *</label>
+                        <input id="editDisciplina" list="dlDisciplinas" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100">
+                        <datalist id="dlDisciplinas"></datalist>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre de la obra *</label>
+                        <input id="editObra" maxlength="150" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Duración (min)</label>
+                        <input type="number" id="editDuracion" min="1" max="180" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue disabled:bg-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nivel</label>
+                        <div class="flex gap-3 text-xs font-semibold pt-2">
+                            <label class="flex items-center gap-1"><input type="radio" name="editNivel" value="Primaria"> Primaria</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="editNivel" value="Secundaria"> Secundaria</label>
+                            <label class="flex items-center gap-1"><input type="radio" name="editNivel" value="Adultos"> Adultos</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="editBoletaInscripcion" class="rounded w-4 h-4"> Boleta Inscripción</label>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="editBoletaResultados" class="rounded w-4 h-4"> Boleta Resultados</label>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="editBoletaObservaciones" class="rounded w-4 h-4"> Boleta Observaciones</label>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold uppercase text-slate-500 mb-2">Integrantes (<span id="editIntegrantesCount">0</span>)</h4>
+                    <div id="editIntegrantesList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div id="editAgregarBox" class="bg-blue-50/60 rounded-xl p-3 border border-blue-200 space-y-2">
+                    <p class="text-[11px] font-bold text-mep-navy uppercase">Agregar otro integrante</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <select id="editInputTipo" class="sm:col-span-3 bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs font-semibold outline-none">
+                            <option value="cedula">Cédula</option><option value="dimex">DIMEX</option><option value="yisro">YIS RÓ</option>
+                        </select>
+                        <input id="editInputCedula" oninput="liveCheckEdicion(this.value)" placeholder="Identidad" autocomplete="off" class="sm:col-span-4 bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs font-semibold outline-none">
+                        <input id="editInputNombre" maxlength="120" placeholder="Nombre completo" class="sm:col-span-5 bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs outline-none">
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] text-slate-500">Los integrantes ya guardados no se pueden quitar desde aquí.</span>
+                        <button type="button" onclick="agregarIntegranteEdicion()" class="btn-mep-primary py-1.5 px-4 rounded-lg font-bold text-xs flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Agregar</button>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeModal('modalInscripcion')" class="flex-1 py-2.5 border border-slate-300 rounded-xl font-bold text-xs text-slate-700 hover:bg-slate-100">Cerrar</button>
+                <button id="btnGuardarEdicionIns" onclick="guardarEdicionInscripcion()" class="flex-1 btn-mep-primary py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editar estudiante propio -->
+    <div id="modalEditarEstudiante" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 border border-slate-100">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Estudiante que usted ingresó</span>
+                    <h3 class="text-lg font-extrabold text-mep-navy mt-1">Editar estudiante</h3>
+                </div>
+                <button onclick="closeModal('modalEditarEstudiante')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <input type="hidden" id="editEstudianteOriginalCedula">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Identidad (no editable)</label>
+                    <div id="editEstudianteCedulaTxt" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono font-semibold text-slate-600"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre completo *</label>
+                    <input type="text" id="editEstudianteNombre" maxlength="120" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Circuito *</label>
+                        <select id="editEstudianteCircuito" onchange="cargarInstitucionesEdicion(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Institución *</label>
+                        <select id="editEstudianteInstitucion" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-mep-blue"></select>
+                    </div>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+                    <strong>Nota:</strong> si la identidad está mal digitada, solicite la corrección al administrador (la identidad es la llave que une al estudiante con todas sus inscripciones).
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeModal('modalEditarEstudiante')" class="flex-1 py-2.5 border border-slate-300 rounded-xl font-bold text-xs text-slate-700 hover:bg-slate-100">Cancelar</button>
+                <button id="btnGuardarEdicionEst" onclick="guardarEdicionEstudiante()" class="flex-1 btn-mep-primary py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <script src="asesor.js"></script>
+</body>
+</html>
